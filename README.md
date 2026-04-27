@@ -1,10 +1,10 @@
 # rag-assistant
 
-Production-shaped Retrieval-Augmented Generation (RAG) service over local
-documents. Built as a portfolio piece to demonstrate the same building blocks
-used in real LLM-assistants: vector index in Postgres, two-stage retrieval, an
-LLM with strict anti-hallucination prompting, async FastAPI, tests with mocked
-models.
+Production-ready заготовка RAG-сервиса (Retrieval-Augmented Generation) поверх
+локальных документов. Сделано как портфолио-проект, чтобы показать те же
+кирпичики, из которых собирают реальные LLM-ассистенты: векторный индекс в
+Postgres, двухстадийный retrieval, LLM с жёстким анти-галлюцинационным
+промптом, async FastAPI, тесты с замоканными моделями.
 
 ```
                 +------------------+
@@ -13,7 +13,7 @@ models.
                           |
                           v
         +-----------------+-------------------+
-        |  Chunking (RecursiveCharacterText)  |
+        |  Чанкинг (RecursiveCharacterText)   |
         +-----------------+-------------------+
                           |
                           v
@@ -23,7 +23,7 @@ models.
                           |
                           v
        +------------------+--------------------+
-       |  PostgreSQL + pgvector (HNSW index)   |
+       |  PostgreSQL + pgvector (HNSW индекс)  |
        +------------------+--------------------+
                           |
        /ask  ------>  vector search top-20
@@ -35,131 +35,131 @@ models.
                           |
                           v
        +------------------+--------------------+
-       |  LLM (OpenAI-compat, RAG prompt)      |
+       |  LLM (OpenAI-совместимый, RAG-промпт) |
        +------------------+--------------------+
                           |
                           v
-                  JSON answer + sources
+                JSON-ответ + источники
 ```
 
-## Why this design
+## Почему именно так
 
-- **Two-stage retrieval (bi-encoder + cross-encoder).** A bi-encoder is fast
-  enough to scan the whole corpus but rough; a cross-encoder is accurate but
-  too slow to run on every chunk. Recall the top-20 with vectors, then rerank
-  to top-5 — standard practice.
-- **pgvector with HNSW.** Keeps the operational story boring: one Postgres
-  instance, one extension, no separate vector DB to babysit. HNSW gives
-  approximate-NN at log-time, ``vector_cosine_ops`` matches what the embedding
-  model produces.
-- **`UNIQUE (source, chunk_index)` + `ON CONFLICT`.** Ingestion is idempotent,
-  so re-running it after editing a document does not duplicate chunks.
-- **Models loaded lazily, behind a `Protocol`.** The retriever takes any
-  object with `embed_query`/`rerank` — tests inject fakes, production gets the
-  real `sentence-transformers` model.
-- **Async FastAPI + a single LLM client owned by `lifespan`.** No per-request
-  client construction, no leaked sockets.
-- **`temperature=0.2` and a system prompt that forbids hallucination.** The
-  point of RAG is to be grounded; we do not want creative reinterpretation.
+- **Двухстадийный retrieval (bi-encoder + cross-encoder).** Bi-encoder быстрый
+  и может сканировать всю базу, но грубоват. Cross-encoder точный, но слишком
+  медленный, чтобы прогонять на каждом чанке. Поэтому достаём топ-20 векторно
+  и реранкуем до топ-5 — стандартная схема.
+- **pgvector + HNSW.** Эксплуатация остаётся скучной: один Postgres, одно
+  расширение, отдельную векторную БД нянчить не надо. HNSW даёт ANN за
+  логарифмическое время, `vector_cosine_ops` совпадает с тем, как косинусная
+  близость считается у эмбеддера.
+- **`UNIQUE (source, chunk_index)` + `ON CONFLICT`.** Ingest идемпотентный:
+  можно перезапускать после правок документа — дубликатов чанков не появится.
+- **Модели грузятся лениво, через `Protocol`.** Retriever принимает любой
+  объект с методами `embed_query`/`rerank` — в тестах подставляются дешёвые
+  фейки, в проде — настоящий `sentence-transformers`.
+- **Async FastAPI + один LLM-клиент на `lifespan`.** Никакого пересоздания
+  клиента на каждый запрос, никаких утёкших сокетов.
+- **`temperature=0.2` и system-промпт, запрещающий галлюцинации.** Смысл RAG
+  в том, чтобы быть привязанным к источникам, а не «творчески
+  переосмысливать» их.
 
-## Stack
+## Стек
 
 - Python 3.11+
 - PostgreSQL 16 + [`pgvector`](https://github.com/pgvector/pgvector)
-- `sentence-transformers` (`intfloat/multilingual-e5-small` for embeddings,
-  `BAAI/bge-reranker-base` for the cross-encoder)
-- `langchain-text-splitters` for chunking
-- FastAPI + `psycopg` 3 + `openai` 1.x async client
+- `sentence-transformers` (`intfloat/multilingual-e5-small` для эмбеддингов,
+  `BAAI/bge-reranker-base` для cross-encoder)
+- `langchain-text-splitters` для чанкинга
+- FastAPI + `psycopg` 3 + async-клиент `openai` 1.x
 - `pytest`, `ruff`
 
-## Quick start
+## Быстрый старт
 
 ```bash
-# 1. Postgres with pgvector
+# 1. Postgres c pgvector
 docker compose up -d
-docker compose exec postgres pg_isready -U rag    # wait for "accepting connections"
+docker compose exec postgres pg_isready -U rag    # ждём "accepting connections"
 
-# 2. Python env
+# 2. Python-окружение
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1                       # PowerShell
 pip install -r requirements.txt                    # core (~80 MB)
 pip install -r requirements-ml.txt                 # torch + sentence-transformers (~3 GB)
 
-# 3. Configure
+# 3. Конфиг
 cp .env.example .env
-# edit .env: OPENAI_API_KEY, OPENAI_BASE_URL, LLM_MODEL
+# отредактировать .env: OPENAI_API_KEY, OPENAI_BASE_URL, LLM_MODEL
 
-# 4. Ingest sample documents
+# 4. Ingest сэмплов
 python -m src.ingest samples/sample_docs
 
-# 5. Serve
+# 5. Запуск API
 uvicorn src.api:app --reload
-# POST http://127.0.0.1:8000/ask  {"question": "What is the company's mission?"}
+# POST http://127.0.0.1:8000/ask  {"question": "Какова миссия компании?"}
 ```
 
-## Configuration
+## Конфигурация
 
-All settings live in `.env` and are loaded by `pydantic-settings` (see
-`src/config.py`). Key ones:
+Все настройки лежат в `.env` и грузятся через `pydantic-settings` (см.
+`src/config.py`). Ключевые:
 
-| Variable | Default | Purpose |
+| Переменная | По умолчанию | Назначение |
 |---|---|---|
-| `POSTGRES_*` | see compose | DB credentials |
-| `EMBEDDING_MODEL` | `intfloat/multilingual-e5-small` | bi-encoder, 384-dim |
+| `POSTGRES_*` | см. compose | креды БД |
+| `EMBEDDING_MODEL` | `intfloat/multilingual-e5-small` | bi-encoder, 384 dim |
 | `RERANKER_MODEL` | `BAAI/bge-reranker-base` | cross-encoder |
-| `CHUNK_SIZE` / `CHUNK_OVERLAP` | 800 / 100 | character-based chunking |
-| `TOP_K_RETRIEVE` / `TOP_K_FINAL` | 20 / 5 | retrieval depth before/after rerank |
-| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `LLM_MODEL` | — | any OpenAI-compatible endpoint |
+| `CHUNK_SIZE` / `CHUNK_OVERLAP` | 800 / 100 | размер и нахлёст чанков (в символах) |
+| `TOP_K_RETRIEVE` / `TOP_K_FINAL` | 20 / 5 | глубина выдачи до и после реранка |
+| `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `LLM_MODEL` | — | любой OpenAI-совместимый эндпоинт |
 
-## Layout
+## Структура
 
 ```
 rag-assistant/
 ├── docker-compose.yml         # postgres + pgvector
-├── scripts/init_db.sql        # extension, table, HNSW index
+├── scripts/init_db.sql        # extension, таблица, HNSW-индекс
 ├── src/
 │   ├── config.py              # pydantic-settings
-│   ├── chunking.py            # RecursiveCharacterTextSplitter wrapper
-│   ├── embeddings.py          # e5 with required "passage:"/"query:" prefixes
+│   ├── chunking.py            # обёртка над RecursiveCharacterTextSplitter
+│   ├── embeddings.py          # e5 c обязательными префиксами "passage:"/"query:"
 │   ├── reranker.py            # bge cross-encoder
-│   ├── retriever.py           # vector_search + rerank, DI-friendly
-│   ├── llm.py                 # async OpenAI-compat client + RAG prompt
-│   ├── ingest.py              # CLI: read docs → chunk → embed → upsert
-│   └── api.py                 # FastAPI app
-├── tests/                     # pytest, all models mocked
-└── samples/sample_docs/       # demo corpus
+│   ├── retriever.py           # vector_search + rerank, дружит с DI
+│   ├── llm.py                 # async OpenAI-клиент + RAG-промпт
+│   ├── ingest.py              # CLI: документы → чанки → эмбеддинги → upsert
+│   └── api.py                 # FastAPI-приложение
+├── tests/                     # pytest, все модели замоканы
+└── samples/sample_docs/       # демо-корпус
 ```
 
-## Tests
+## Тесты
 
 ```bash
-pytest          # 16 tests, ~3s, no torch required
+pytest          # 16 тестов, ~3 c, torch не нужен
 ruff check src tests
 ```
 
-The unit tests do **not** load `sentence-transformers` — they inject
-`FakeEmbedder` / `FakeReranker` through the retriever's `Protocol`s and mock
-the OpenAI client. CI (see `.github/workflows/ci.yml`) installs only
-`requirements.txt` for the same reason.
+Юнит-тесты **не загружают** `sentence-transformers` — они подсовывают
+`FakeEmbedder` / `FakeReranker` через `Protocol`-ы retriever-а и мокают
+OpenAI-клиента. CI (см. `.github/workflows/ci.yml`) ставит ровно
+`requirements.txt` по той же причине.
 
-## What I would do differently for production
+## Что бы я сделал иначе для прода
 
-- Move embedding and reranker model loading off the request path entirely —
-  either pre-warm at startup, or run them as a separate gRPC/Triton service so
-  the API container stays small.
-- Stream the LLM response (Server-Sent Events) instead of waiting for the full
-  completion — the user-perceived latency drops drastically.
-- Replace cosine-distance + HNSW defaults with a tuned `ef_search` and run a
-  recall@k benchmark on a real golden set; HNSW parameters matter more than
-  most people admit.
-- Add **metadata filters** (`WHERE source LIKE ...`, ACL, document version)
-  before vector search — purely-vector RAG is a footgun for any corpus with
-  conflicting versions.
-- Hook in **LangSmith** or **W&B Weave** for tracing every retrieval and LLM
-  call: which chunks were retrieved, what the rerank scores were, whether the
-  user accepted the answer. Without that you cannot improve the system.
-- Add an **eval harness** (golden Q→A pairs + LLM-as-a-judge for free-form
-  answers) and run it in CI on every prompt or model change.
-- Authentication, rate limiting, structured logging, OpenTelemetry — none of
-  which belong in a portfolio project but all of which I'd add on day one of a
-  real deployment.
+- Вынес бы загрузку моделей эмбеддера и реранкера с request-path:
+  либо прогревать на старте, либо запускать как отдельный gRPC/Triton-сервис,
+  чтобы контейнер с API оставался лёгким.
+- Стримил бы ответ LLM (Server-Sent Events) вместо ожидания полного
+  completion — воспринимаемая пользователем задержка падает кратно.
+- Подобрал бы `ef_search` у HNSW и прогнал бы recall@k на реальном golden-set;
+  параметры HNSW влияют сильнее, чем принято признавать.
+- Добавил бы **метаданные-фильтры** (`WHERE source LIKE ...`, ACL, версия
+  документа) до векторного поиска — чисто-векторный RAG ломается на любом
+  корпусе, где есть конфликтующие версии одного и того же документа.
+- Прикрутил бы **LangSmith** или **W&B Weave** для трейсинга каждого
+  retrieval и LLM-вызова: какие чанки достали, какие были rerank-скоры,
+  принял ли пользователь ответ. Без этого систему улучшать невозможно.
+- Сделал бы **eval-харнес** (golden Q→A пары + LLM-as-a-judge для свободных
+  ответов) и гонял бы его в CI на каждое изменение промпта или модели.
+- Аутентификация, rate limiting, структурированные логи, OpenTelemetry —
+  ничему из этого не место в портфолио-проекте, но всё это я бы добавил
+  в первый же день реального деплоя.
