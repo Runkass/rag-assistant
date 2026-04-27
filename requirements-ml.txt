@@ -1,0 +1,4 @@
+# Heavy ML dependencies: only needed for actually running embeddings and the
+# reranker locally (i.e. for `python -m src.ingest` and live retrieval).
+# Unit tests use mocks and do not require these.
+sentence-transformers>=3.3

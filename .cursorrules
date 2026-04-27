@@ -1,0 +1,28 @@
+# Project conventions for rag-assistant
+
+## Stack
+- Python 3.11+, type hints required on public functions.
+- FastAPI for HTTP, psycopg 3 (sync) for DB, openai 1.x async client.
+- pgvector + HNSW index, cosine distance.
+- sentence-transformers for embeddings + reranker.
+- pytest with `asyncio_mode = "auto"`, ruff for lint.
+
+## Style
+- `from __future__ import annotations` at the top of every module.
+- Public functions have a short docstring explaining *why*, not *what*.
+- No bare `except:`; catch the narrowest exception that makes sense.
+- Prefer dependency injection (Protocols) over module-level globals so tests
+  can swap in fakes without monkeypatching internals.
+- SQL lives in inline strings, parameterised — never f-string interpolation.
+
+## Tests
+- Unit tests must NOT require torch / sentence-transformers / a live Postgres.
+  Use `FakeEmbedder`, `FakeReranker`, mocked `psycopg` connection, mocked
+  `AsyncOpenAI`.
+- One assertion concept per test, descriptive `test_*` names.
+- New features need at least one happy-path test and one failure-mode test.
+
+## Don't
+- Don't add new dependencies without updating `requirements.txt` / `requirements-ml.txt`.
+- Don't put heavy model loads at import time — use `@lru_cache` on a getter.
+- Don't bypass `pydantic-settings`; all config goes through `src/config.py`.
